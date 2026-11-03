@@ -1,0 +1,1 @@
+SELECT * FROM telemetry_logs ORDER BY recorded_at DESC LIMIT 5;
