@@ -1,3 +1,4 @@
+import os
 import logging
 from datetime import datetime
 from typing import Optional
@@ -6,14 +7,17 @@ from fastapi import FastAPI, HTTPException, status
 from psycopg2.pool import ThreadedConnectionPool
 from psycopg2 import OperationalError
 from pydantic import BaseModel, Field, ConfigDict
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
 
 DB_CONFIG: dict = {
-    "host":     "localhost",
-    "port":     5432,
-    "dbname":   "smartgrow",
-    "user":     "postgres",
-    "password": "bytekeith",
+    "host":     os.getenv("DB_HOST", "localhost"),
+    "port":     int(os.getenv("DB_PORT", 5432)),
+    "dbname":   os.getenv("DB_NAME", "smartgrow"),
+    "user":     os.getenv("DB_USER", "postgres"),
+    "password": os.getenv("DB_PASSWORD"),  # No fallback for security
 }
 
 API_HOST: str = "0.0.0.0"
@@ -70,9 +74,6 @@ def health() -> dict:
           status_code=status.HTTP_201_CREATED,
           tags=["telemetry"])
 def ingest_telemetry(packet: TelemetryPacket) -> dict:
-    """
-    Accept a validated telemetry packet, persist it, and echo back the row id.
-    """
     log.info("→ Incoming packet | moisture=%d%% | temperature=%.2f°C",
              packet.moisture, packet.temperature)
 
@@ -112,10 +113,6 @@ def ingest_telemetry(packet: TelemetryPacket) -> dict:
         if conn:
             db_pool.putconn(conn)
 
-
-# ---------------------------------------------------------------------------
-# DEV LAUNCHER (so `python -m backend.server` also works)
-# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.server:app", host=API_HOST, port=API_PORT, reload=True)
