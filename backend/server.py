@@ -1,14 +1,3 @@
-"""
-Smart-Grow :: Telemetry Backend (FastAPI)
-=========================================
-Hardware-agnostic ingestion endpoint. Accepts clean JSON from either a
-Python mock or a physical ESP32 node, validates against the Pydantic
-contract, and commits to PostgreSQL.
-
-Run with:
-    uvicorn backend.server:app --host 0.0.0.0 --port 8000 --reload
-"""
-
 import logging
 from datetime import datetime
 from typing import Optional
@@ -18,10 +7,7 @@ from psycopg2.pool import ThreadedConnectionPool
 from psycopg2 import OperationalError
 from pydantic import BaseModel, Field, ConfigDict
 
-# ---------------------------------------------------------------------------
-# CONFIGURATION BLOCK — swap these values per environment
-# (localhost today → remote server / cloud later, zero code changes)
-# ---------------------------------------------------------------------------
+
 DB_CONFIG: dict = {
     "host":     "localhost",
     "port":     5432,
@@ -33,9 +19,6 @@ DB_CONFIG: dict = {
 API_HOST: str = "0.0.0.0"
 API_PORT: int = 8000
 
-# ---------------------------------------------------------------------------
-# LOGGING
-# ---------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
@@ -43,9 +26,6 @@ logging.basicConfig(
 )
 log = logging.getLogger("smart-grow.backend")
 
-# ---------------------------------------------------------------------------
-# THREAD-SAFE CONNECTION POOL (one pool per process; FastAPI reuses it)
-# ---------------------------------------------------------------------------
 try:
     db_pool = ThreadedConnectionPool(minconn=1, maxconn=10, **DB_CONFIG)
     log.info("PostgreSQL connection pool initialised (1-10 conns).")
@@ -53,9 +33,6 @@ except OperationalError as exc:
     log.critical("Could not create DB pool — is PostgreSQL running? %s", exc)
     raise
 
-# ---------------------------------------------------------------------------
-# PYDANTIC CONTRACT — the single source of truth for network payloads
-# ---------------------------------------------------------------------------
 class TelemetryPacket(BaseModel):
     """Wire format accepted from ANY sensor node (mock or real)."""
     model_config = ConfigDict(extra="forbid")   # reject unknown fields early
@@ -65,9 +42,6 @@ class TelemetryPacket(BaseModel):
     temperature: float = Field(..., ge=-50.0, le=100.0,
                                description="Ambient temperature in Celsius")
 
-# ---------------------------------------------------------------------------
-# FASTAPI APP
-# ---------------------------------------------------------------------------
 app = FastAPI(
     title="Smart-Grow Telemetry API",
     version="0.1.0",

@@ -1,0 +1,19 @@
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyCharm / JetBrains
+.idea/
+*.iml
+
+# Environment Variables
+.env
+
+# Database
+*.sqlite3

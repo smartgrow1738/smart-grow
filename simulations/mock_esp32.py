@@ -1,15 +1,3 @@
-"""
-Smart-Grow :: Mock ESP32 Field Node
-===================================
-Emulates the real ESP32 + capacitive moisture + DHT11 rig until hardware
-arrives. Produces a *realistic* soil profile (slow drying between watering
-events, daily temperature curve) so your ML pipeline later sees believable
-data.
-
-Run with:
-    python -m simulations.mock_esp32
-"""
-
 import math
 import random
 import time
@@ -17,25 +5,12 @@ from datetime import datetime
 
 import requests
 
-# ---------------------------------------------------------------------------
-# CONFIGURATION BLOCK
-# Point TARGET_URL at a LAN/remote IP later — no other code changes needed.
-# ---------------------------------------------------------------------------
 TARGET_URL: str       = "http://127.0.0.1:8000/api/v1/telemetry"
 INTERVAL_SECONDS: int = 5              # packet cadence
 REQUEST_TIMEOUT: int  = 5              # seconds before giving up
 
-# ---------------------------------------------------------------------------
-# REALISTIC SENSOR PROFILE
-# ---------------------------------------------------------------------------
 def simulate_field_reading() -> dict:
-    """
-    Produce a plausible (moisture, temperature) pair.
 
-    - Moisture dries slowly (evaporation) but "refills" periodically to
-      simulate a watering event.
-    - Temperature follows a gentle diurnal-ish sine curve + small noise.
-    """
     now = datetime.now()
     minute_of_day = now.hour * 60 + now.minute
 
@@ -55,9 +30,7 @@ def simulate_field_reading() -> dict:
             "temperature": temperature}
 
 
-# ---------------------------------------------------------------------------
 # MAIN LOOP
-# ---------------------------------------------------------------------------
 def run_mock_node() -> None:
     print("=" * 62)
     print(" Smart-Grow :: Mock ESP32 node starting")
