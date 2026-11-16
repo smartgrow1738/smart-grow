@@ -8,6 +8,9 @@ import requests
 TARGET_URL: str = "http://127.0.0.1:8000/api/v1/telemetry"
 INTERVAL_SECONDS: int = 5  # packet cadence
 REQUEST_TIMEOUT: int = 5  # seconds before giving up
+CYCLE_SECONDS: int = 180  # one dry-down + watering cycle (compressed for demos)
+
+START_TIME: float = time.monotonic()  # cycle starts when the script starts
 
 
 def simulate_field_reading() -> dict:
@@ -18,10 +21,11 @@ def simulate_field_reading() -> dict:
     temp_base = 22.0 + 5.0 * math.sin((minute_of_day / 1440.0) * 2 * math.pi - math.pi / 2)
     temperature = round(temp_base + random.uniform(-0.4, 0.4), 2)
 
-    # ---- Moisture: drifts downward over a 2-hour cycle, then a watering spike ----
-    drying = (minute_of_day % 120) / 120.0  # 0 → 1 over 2 hours
-    moisture = int(75 - (drying * 50))  # 75% → 25% (crosses the 30% pump threshold)
-    if minute_of_day % 120 >= 115:  # watering event near cycle end
+    # ---- Moisture: dries 75% → 25% over 90% of the cycle, then a watering spike ----
+    phase = ((time.monotonic() - START_TIME) % CYCLE_SECONDS) / CYCLE_SECONDS  # 0 → 1
+    if phase < 0.9:
+        moisture = int(75 - (phase / 0.9) * 50)  # crosses the 30% pump threshold
+    else:  # watering event at cycle end
         moisture = 78
 
     return {"moisture": max(0, min(100, moisture)),
@@ -33,7 +37,7 @@ def run_mock_node() -> None:
     print("=" * 62)
     print(" Smart-Grow :: Mock ESP32 node starting")
     print(f" Target endpoint : {TARGET_URL}")
-    print(f" Cadence         : {INTERVAL_SECONDS}s")
+    print(f" Cadence         : {INTERVAL_SECONDS}s | dry-down cycle: {CYCLE_SECONDS}s")
     print("=" * 62)
 
     while True:
