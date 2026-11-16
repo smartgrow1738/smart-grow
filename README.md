@@ -12,8 +12,8 @@ whether to water — **before** the plant gets too dry, not after.
        +--------------------- reply: PUMP_ON / PUMP_OFF + reason -----------------+
 ```
 
-1. **Sense** — Every few seconds the ESP32 sends `{"moisture": 42, "temperature": 24.5}`
-   to `POST /api/v1/telemetry`.
+1. **Sense** — Every 5 seconds the ESP32 sends `{"moisture": 42.0}` (plus `"temperature"` if a
+   DHT11 is fitted) to `POST /api/v1/telemetry`.
 2. **Validate** — The backend rejects anything malformed (out-of-range, missing, extra fields,
    failed sensor = `null`) with HTTP 422 and logs the raw packet so we can debug the board.
 3. **Predict** — A Random Forest model (`ml_models/moisture_predictor.pkl`) predicts the
@@ -49,7 +49,7 @@ on the safety rule alone, so plants are never left unprotected.
 | `database/schema.sql` | `telemetry_logs` table (safe to re-run; migrates older databases) |
 | `simulations/mock_esp32.py` | Fake ESP32 — lets us test the whole pipeline without hardware |
 | `notebooks/` | Week 1 telemetry validation |
-| `firmware/` | ESP32 code (hardware arriving) |
+| `firmware/smart_grow_node/` | ESP32 sketch: soil sensor -> backend -> relay |
 
 ## Run it
 
@@ -64,15 +64,28 @@ python simulations/mock_esp32.py        # in a second terminal: fake sensor traf
 
 Health check: `GET /health` → `{"status": "ok", "db": "connected", "ai_model": "loaded"}`.
 
-## Connecting the real ESP32
+## Hardware rig (demo build)
 
-- Post to `http://<laptop-LAN-IP>:8000/api/v1/telemetry` (find the IP with `ipconfig`;
-  laptop and ESP32 must be on the same Wi-Fi).
-- Header `Content-Type: application/json`; body exactly `{"moisture": 0-100, "temperature": float}`.
-- Read `ai_prediction.decision` from the reply: `"PUMP_ON"` → relay on.
-- Windows Firewall blocks port 8000 by default. Allow it once from an **admin** PowerShell:
-  `New-NetFirewallRule -DisplayName "Smart-Grow API" -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow`
-- If the board gets HTTP 422, the backend console shows exactly which field was wrong.
+Sketch: `firmware/smart_grow_node/smart_grow_node.ino` (Arduino IDE, board "ESP32 Dev Module", no extra libraries).
+
+| Part | Pin | Note |
+|---|---|---|
+| Resistive soil module VCC / GND / AO | 3V3 / GND / GPIO34 | **3V3, not 5V**: AO must stay under 3.3V. GPIO34 is ADC1 (ADC2 dies when Wi-Fi is on) |
+| Relay module VCC / GND / IN | VIN(5V) / GND / GPIO26 | Set `RELAY_ACTIVE_LOW` if it is ON when it should be OFF |
+| Onboard LED | GPIO2 | Mirrors pump state |
+
+**No pump and no DHT11 on the demo rig.** The pump is shown by the relay click + LEDs (and can be
+replaced by a real pump on the relay's COM/NO terminals later with no code change). Without a
+temperature sensor the board sends only moisture; the AI assumes `DEFAULT_TEMPERATURE` (25°C)
+and the database stores temperature as NULL, so assumed values are never mistaken for readings.
+
+Bring-up order:
+1. Flash, open Serial Monitor (115200). Note `SOIL raw=` with probe in air (`DRY_RAW`) and in water (`WET_RAW`), re-flash.
+2. Set `WIFI_SSID`/`WIFI_PASS` (2.4 GHz; a phone hotspot that the laptop also joins is the safest demo network).
+3. Set `SERVER_URL` to `http://<laptop-IP>:8000/api/v1/telemetry` (`ipconfig`).
+4. Allow port 8000 through Windows Firewall once, from an **admin** PowerShell:
+   `New-NetFirewallRule -DisplayName "Smart-Grow API" -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow`
+5. If the board gets HTTP 422, the backend console shows exactly which field was wrong.
 
 ## Tuning (in `.env`, no code change)
 
@@ -80,10 +93,12 @@ Health check: `GET /health` → `{"status": "ok", "db": "connected", "ai_model":
 |---|---|---|
 | `CRITICAL_MOISTURE` | 30 | Always water below this % |
 | `PREDICTION_HORIZON_H` | 2.0 | Water early if critical level is forecast within this many hours |
+| `DEFAULT_TEMPERATURE` | 25.0 | Temperature the AI assumes when a node sends none |
 
 ## Known limitations
 
 - The model is trained on **synthetic** data (hotter + drier = faster drying). Once the real
   sensor has logged a few days, retrain on real readings from `telemetry_logs`.
+- Demo rig has no pump or temperature sensor (see Hardware rig).
 - The decision is stateless (one reading at a time); there is no pump run-time limit yet.
 - No authentication on the API — fine on a private network, not for the public internet.

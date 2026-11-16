@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timezone
 import pickle
 import threading
+from typing import Optional
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Request, status
@@ -37,6 +38,8 @@ API_PORT: int = 8000
 # Irrigation agent tuning (override via .env without touching code)
 CRITICAL_MOISTURE: float = float(os.getenv("CRITICAL_MOISTURE", 30))   # % — always water below this
 PREDICTION_HORIZON_H: float = float(os.getenv("PREDICTION_HORIZON_H", 2.0))  # water early if critical is this close
+# Used by the model when a node has no temperature sensor (stored as NULL, never as a reading)
+DEFAULT_TEMPERATURE: float = float(os.getenv("DEFAULT_TEMPERATURE", 25.0))  # C
 
 # Feature ranges the model was trained on (keep in sync with ml_models/train_predictor.py).
 # Random Forests cannot extrapolate, so inputs are clipped into this box before predicting.
@@ -107,7 +110,8 @@ class TelemetryPacket(BaseModel):
     model_config = ConfigDict(extra="forbid")
     # float so firmware may send 45.6; rounded to int before storage.
     moisture: float = Field(..., ge=0, le=100)
-    temperature: float = Field(..., ge=-50.0, le=100.0)
+    # Optional: nodes without a DHT11 omit it; the model then assumes DEFAULT_TEMPERATURE.
+    temperature: Optional[float] = Field(None, ge=-50.0, le=100.0)
 
 
 # ---------------------------------------------------------------------------
@@ -194,15 +198,18 @@ def health() -> JSONResponse:
 @app.post("/api/v1/telemetry", status_code=status.HTTP_201_CREATED, tags=["telemetry"])
 def ingest_telemetry(packet: TelemetryPacket) -> dict:
     moisture = int(round(packet.moisture))
+    temp_measured = packet.temperature is not None
+    temperature = packet.temperature if temp_measured else DEFAULT_TEMPERATURE
 
     # 1. AI prediction + 2. decision
-    drying_rate = predict_drying_rate(packet.temperature, moisture)
+    drying_rate = predict_drying_rate(temperature, moisture)
     decision, hours_to_critical, reason = decide_irrigation(moisture, drying_rate)
 
     rate_txt = f"{drying_rate:.2f}%/hr" if drying_rate is not None else "n/a"
     eta_txt = f"{hours_to_critical:.1f}h" if hours_to_critical is not None else "n/a"
-    log.info("Packet moisture=%d%% temp=%.2fC | rate=%s to_critical=%s | %s (%s)",
-             moisture, packet.temperature, rate_txt, eta_txt, decision, reason)
+    temp_txt = f"{temperature:.2f}C" if temp_measured else f"n/a (assumed {temperature:g}C)"
+    log.info("Packet moisture=%d%% temp=%s | rate=%s to_critical=%s | %s (%s)",
+             moisture, temp_txt, rate_txt, eta_txt, decision, reason)
 
     # 3. Save reading + AI output to database
     conn = None
@@ -237,6 +244,7 @@ def ingest_telemetry(packet: TelemetryPacket) -> dict:
             "hours_to_critical": round(hours_to_critical, 1) if hours_to_critical is not None else None,
             "decision": decision,
             "reason": reason,
+            "temperature_assumed": not temp_measured,
         },
     }
 

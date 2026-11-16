@@ -13,5 +13,8 @@ ALTER TABLE telemetry_logs ADD COLUMN IF NOT EXISTS predicted_drying_rate NUMERI
 ALTER TABLE telemetry_logs ADD COLUMN IF NOT EXISTS pump_decision VARCHAR(8)
     CHECK (pump_decision IN ('PUMP_ON', 'PUMP_OFF'));
 
+-- Temperature is optional (nodes without a DHT11). Re-runnable.
+ALTER TABLE telemetry_logs ALTER COLUMN temperature DROP NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_telemetry_logs_recorded_at
     ON telemetry_logs (recorded_at DESC);
