@@ -5,25 +5,23 @@ from datetime import datetime
 
 import requests
 
-TARGET_URL: str       = "http://127.0.0.1:8000/api/v1/telemetry"
-INTERVAL_SECONDS: int = 5              # packet cadence
-REQUEST_TIMEOUT: int  = 5              # seconds before giving up
+TARGET_URL: str = "http://127.0.0.1:8000/api/v1/telemetry"
+INTERVAL_SECONDS: int = 5  # packet cadence
+REQUEST_TIMEOUT: int = 5  # seconds before giving up
+
 
 def simulate_field_reading() -> dict:
-
     now = datetime.now()
     minute_of_day = now.hour * 60 + now.minute
 
     # ---- Temperature: ~22°C mean, ±5°C daily swing ----
-    temp_base  = 22.0 + 5.0 * math.sin((minute_of_day / 1440.0) * 2 * math.pi - math.pi / 2)
+    temp_base = 22.0 + 5.0 * math.sin((minute_of_day / 1440.0) * 2 * math.pi - math.pi / 2)
     temperature = round(temp_base + random.uniform(-0.4, 0.4), 2)
 
-    # ---- Moisture: drifts downward, random watering spikes ----
-    # deterministic seed per minute so it "trends" rather than jumps randomly
-    random.seed(minute_of_day)
-    drying = (minute_of_day % 120) / 120.0        # 0 → 1 over 2 hours
-    moisture = int(75 - (drying * 35))            # 75% → 40%
-    if minute_of_day % 120 >= 115:                # watering event near cycle end
+    # ---- Moisture: drifts downward over a 2-hour cycle, then a watering spike ----
+    drying = (minute_of_day % 120) / 120.0  # 0 → 1 over 2 hours
+    moisture = int(75 - (drying * 50))  # 75% → 25% (crosses the 30% pump threshold)
+    if minute_of_day % 120 >= 115:  # watering event near cycle end
         moisture = 78
 
     return {"moisture": max(0, min(100, moisture)),
@@ -49,9 +47,11 @@ def run_mock_node() -> None:
             )
             if resp.status_code == 201:
                 body = resp.json()
+                ai = body.get("ai_prediction", {})
                 print(
                     f"[{datetime.now():%H:%M:%S}] ✓ moisture={payload['moisture']}%  "
-                    f"temp={payload['temperature']}°C  → row_id={body.get('row_id')}"
+                    f"temp={payload['temperature']}°C  → row_id={body.get('row_id')}  "
+                    f"AI={ai.get('decision')} ({ai.get('reason')})"
                 )
             else:
                 print(
