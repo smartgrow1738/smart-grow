@@ -20,15 +20,13 @@
 
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include "secrets.h"  // WIFI_SSID, WIFI_PASS, SERVER_URL -- copy secrets.h.example, never commit
 
 // ---------------- CONFIG: edit these ----------------
-const char* WIFI_SSID  = "YOUR_WIFI_NAME";      // 2.4 GHz only
-const char* WIFI_PASS  = "YOUR_WIFI_PASSWORD";
-const char* SERVER_URL = "http://192.168.0.128:8000/api/v1/telemetry";  // laptop IP (ipconfig)
 
 // Calibration: read SOIL raw values from Serial Monitor, then set these.
-const int DRY_RAW = 4095;   // probe in open air
-const int WET_RAW = 1500;   // probe in a glass of water
+const int DRY_RAW = 4095;   // probe in open air (measured 4095)
+const int WET_RAW = 1200;   // probe in a glass of water (measured ~1190-1270)
 
 // Many relay modules switch ON when IN is LOW. If yours is ON when it should be OFF, flip this.
 const bool RELAY_ACTIVE_LOW = false;
@@ -59,6 +57,18 @@ void connectWifi() {
     Serial.printf("\nWi-Fi OK, ESP32 IP: %s\n", WiFi.localIP().toString().c_str());
   } else {
     Serial.println("\nWi-Fi FAILED (check SSID/password, 2.4 GHz). Retrying next cycle.");
+    WiFi.disconnect();  // stop the pending attempt so the next begin() is accepted
+    // List what the ESP32 can actually see (it only sees 2.4 GHz networks)
+    int n = WiFi.scanNetworks();
+    bool found = false;
+    Serial.printf("Networks visible to the ESP32 (%d):\n", n);
+    for (int i = 0; i < n; i++) {
+      Serial.printf("  '%s'  ch%d  %ddBm\n", WiFi.SSID(i).c_str(), WiFi.channel(i), WiFi.RSSI(i));
+      if (WiFi.SSID(i) == WIFI_SSID) found = true;
+    }
+    Serial.println(found ? "-> Target network IS visible: password is probably wrong."
+                         : "-> Target network NOT visible: hotspot is off or on 5 GHz.");
+    WiFi.scanDelete();
   }
 }
 

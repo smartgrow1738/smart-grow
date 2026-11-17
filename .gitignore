@@ -17,3 +17,8 @@ __pycache__/
 
 # Database
 *.sqlite3
+# ESP32 Wi-Fi credentials
+firmware/**/secrets.h
+
+# Runtime logs
+logs/*.log

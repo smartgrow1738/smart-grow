@@ -66,7 +66,7 @@ Health check: `GET /health` → `{"status": "ok", "db": "connected", "ai_model":
 
 ## Hardware rig (demo build)
 
-Sketch: `firmware/smart_grow_node/smart_grow_node.ino` (Arduino IDE, board "ESP32 Dev Module", no extra libraries).
+Sketch: `firmware/smart_grow_node/smart_grow_node.ino` (copy `secrets.h.example` to `secrets.h` for Wi-Fi/server settings) (Arduino IDE, board "ESP32 Dev Module", no extra libraries).
 
 | Part | Pin | Note |
 |---|---|---|
