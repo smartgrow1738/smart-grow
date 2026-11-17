@@ -64,6 +64,22 @@ python simulations/mock_esp32.py        # in a second terminal: fake sensor traf
 
 Health check: `GET /health` → `{"status": "ok", "db": "connected", "ai_model": "loaded"}`.
 
+## Dashboard
+
+Open **http://localhost:8000/** once the backend is running (a phone on the same hotspot can use
+`http://192.168.137.1:8000/`). It refreshes every 3 s and shows:
+
+- **Readiness banner**: Ready / Running with warnings / Not ready, from these checks:
+  database reachable, AI model loaded, sensor node online (late after 20 s, offline after 60 s),
+  soil probe not stuck at 0% or 100%, no recently rejected packets. Each failing check says how to fix it.
+- **Live reading**: moisture, pump decision and the AI's reason, drying rate, time to critical.
+- **Chart** of the last 10 minutes with the critical line and pump-on moments.
+- **Ask the AI (what-if)**: try any moisture/temperature and see the decision. Nothing is stored and no pump moves.
+
+The dashboard is read-only and needs no internet (no CDNs). It runs under a strict Content-Security-Policy,
+and all values are rendered as text, so a bad packet cannot inject anything into the page.
+Data comes from `GET /api/v1/status`, and the what-if panel uses `POST /api/v1/predict`.
+
 ## Hardware rig (demo build)
 
 Sketch: `firmware/smart_grow_node/smart_grow_node.ino` (copy `secrets.h.example` to `secrets.h` for Wi-Fi/server settings) (Arduino IDE, board "ESP32 Dev Module", no extra libraries).
@@ -101,4 +117,4 @@ Bring-up order:
   sensor has logged a few days, retrain on real readings from `telemetry_logs`.
 - Demo rig has no pump or temperature sensor (see Hardware rig).
 - The decision is stateless (one reading at a time); there is no pump run-time limit yet.
-- No authentication on the API — fine on a private network, not for the public internet.
+- No authentication on the API or dashboard. That's fine on a private network such as the laptop hotspot, but not on the public internet.

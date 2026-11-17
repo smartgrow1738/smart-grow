@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart-Grow Control</title>
+  <link rel="stylesheet" href="/static/dashboard.css">
+  <script src="/static/dashboard.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>Smart-Grow</h1>
+      <p class="sub">AI irrigation control panel</p>
+    </div>
+    <div class="meta">
+      <span id="uptime">Connecting...</span>
+      <span id="updated"></span>
+    </div>
+  </header>
+
+  <div id="offline" class="offline" hidden>
+    Lost contact with the backend. Is the server window still open? Retrying...
+  </div>
+
+  <main>
+    <section id="overall" class="overall state-unknown" aria-live="polite">
+      <span class="dot"></span>
+      <div>
+        <strong id="overall-title">Checking the system...</strong>
+        <p id="overall-detail">Running readiness checks.</p>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Readiness checks</h2>
+        <ul id="checks" class="checks"></ul>
+      </section>
+
+      <section class="card live">
+        <h2>Live reading</h2>
+        <div class="reading">
+          <div>
+            <span id="moisture" class="big">--</span><span class="unit">% moisture</span>
+          </div>
+          <span id="pump" class="pump pump-unknown">PUMP --</span>
+        </div>
+        <p id="reason" class="reason">Waiting for the first reading.</p>
+        <dl class="stats">
+          <div><dt>Drying rate (AI)</dt><dd id="rate">--</dd></div>
+          <div><dt>Time to critical</dt><dd id="eta">--</dd></div>
+          <div><dt>Temperature</dt><dd id="temp">--</dd></div>
+          <div><dt>Reading age</dt><dd id="age">--</dd></div>
+        </dl>
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Last 10 minutes</h2>
+        <span class="legend"><i class="lg-line"></i>moisture <i class="lg-crit"></i><span id="crit-label">critical</span> <i class="lg-on"></i>pump on</span>
+      </div>
+      <svg id="chart" class="chart" viewBox="0 0 640 220" role="img" aria-label="Soil moisture over the last 10 minutes"></svg>
+      <p id="window-stats" class="muted"></p>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Ask the AI (what-if)</h2>
+        <p class="muted">Test a reading without storing it or moving the pump.</p>
+        <form id="whatif" class="whatif" novalidate>
+          <label>Moisture <output id="wi-m-out">40</output>%
+            <input id="wi-m" type="range" min="0" max="100" step="1" value="40">
+          </label>
+          <label>Temperature (C, blank = assume room temperature)
+            <input id="wi-t" type="number" min="-50" max="100" step="0.5" placeholder="e.g. 38" inputmode="decimal">
+          </label>
+          <button type="submit">Ask the AI</button>
+        </form>
+        <div id="wi-result" class="wi-result" hidden></div>
+      </section>
+
+      <section class="card">
+        <h2>Recent readings</h2>
+        <table class="table">
+          <thead><tr><th>When</th><th>Moisture</th><th>Rate</th><th>Decision</th></tr></thead>
+          <tbody id="rows"><tr><td colspan="4" class="muted">No readings yet.</td></tr></tbody>
+        </table>
+      </section>
+    </div>
+  </main>
+
+  <footer class="foot">API docs: <a href="/docs">/docs</a> &middot; Health: <a href="/health">/health</a></footer>
+</body>
+</html>
